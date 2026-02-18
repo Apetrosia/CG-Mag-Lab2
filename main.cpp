@@ -9,6 +9,7 @@ GLuint Program;
 GLuint VAO_square, VBO_square, EBO_square;
 GLuint VAO_triangle, VBO_triangle, EBO_triangle;
 
+int task = 1;
 
 // Вершины: coord (x,y,z) + color (r,g,b)
 std::vector<GLfloat> vertices_square = {
@@ -150,15 +151,20 @@ void InitBuffers()
 
 void Draw()
 {
-    glViewport(0, 0, 800, 800);
-    glUseProgram(Program);
-    glBindVertexArray(VAO_square);
-    glDrawElements(GL_QUADS, indices_square.size(), GL_UNSIGNED_INT, 0);
+    if (task == 1)
+    {
+        // Левая половина экрана (квадрат)
+        glViewport(0, 0, 800, 800);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_square);
+        glDrawElements(GL_QUADS, indices_square.size(), GL_UNSIGNED_INT, 0);
 
-    glViewport(800, 0, 800, 800);
-    glUseProgram(Program);
-    glBindVertexArray(VAO_triangle);
-    glDrawElements(GL_TRIANGLES, indices_triangle.size(), GL_UNSIGNED_INT, 0);
+        // Правая половина экрана (треугольник)
+        glViewport(800, 0, 800, 800);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_triangle);
+        glDrawElements(GL_TRIANGLES, indices_triangle.size(), GL_UNSIGNED_INT, 0);
+    }
 }
 
 int main()
@@ -183,11 +189,19 @@ int main()
         {
             if (e.type == sf::Event::Closed)
                 window.close();
+            if (e.type == sf::Event::KeyPressed)
+            {
+                switch (e.key.code)
+                {
+                case(sf::Keyboard::Num1):
+                    task = 1;
+                    break;
+                }
+            }
         }
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Левая половина экрана (квадрат)
         Draw();
 
         window.display();
