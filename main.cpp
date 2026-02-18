@@ -8,6 +8,9 @@
 GLuint Program;
 GLuint VAO_square, VBO_square, EBO_square;
 GLuint VAO_triangle, VBO_triangle, EBO_triangle;
+GLuint VAO_pentagon, VBO_pentagon, EBO_pentagon;
+
+GLfloat transformMatrix[16];
 
 int task = 1;
 
@@ -28,6 +31,16 @@ std::vector<GLfloat> vertices_triangle = {
      0.0f,  0.5f, 0.0f,  0.0f, 1.0f, 0.0f, // верхняя
 };
 
+std::vector<GLfloat> vertices_pentagon = {
+    // x,     y,    z      r,   g,   b
+	 0.0f,  -0.5f,   0.0f, 1.0f, 0.0f, 0.0f,
+     0.475f,-0.155f, 0.0f, 1.0f, 0.0f, 0.0f,
+     0.293f, 0.405f, 0.0f, 1.0f, 0.0f, 0.0f,
+    -0.293f, 0.405f, 0.0f, 1.0f, 0.0f, 0.0f,
+    -0.475f,-0.155f, 0.0f, 1.0f, 0.0f, 0.0f,
+};
+
+
 std::vector<GLuint> indices_square = {
     0, 1, 2, 3
 };
@@ -35,6 +48,61 @@ std::vector<GLuint> indices_square = {
 std::vector<GLuint> indices_triangle = {
     0, 1, 2
 };
+std::vector<GLuint> indices_pentagon = {
+    0, 1, 2, 3, 4
+};
+
+void CreateTransformMatrix(float angleX, float angleY, float angleZ)
+{
+    GLfloat rx[16] = {
+        1,0,0,0,
+        0,cos(angleX),-sin(angleX),0,
+        0,sin(angleX), cos(angleX),0,
+        0,0,0,1
+    };
+
+    GLfloat ry[16] = {
+        cos(angleY),0,sin(angleY),0,
+        0,1,0,0,
+        -sin(angleY),0,cos(angleY),0,
+        0,0,0,1
+    };
+
+    GLfloat rz[16] = {
+        cos(angleZ),-sin(angleZ),0,0,
+        sin(angleZ), cos(angleZ),0,0,
+        0,0,1,0,
+        0,0,0,1
+    };
+
+    GLfloat s[16] = {
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,0,1
+    };
+
+    GLfloat t1[16], t2[16];
+
+    for (int i = 0; i < 16; i++)
+        t1[i] = ry[i % 4] * rx[i / 4 * 4] +
+        ry[i % 4 + 4] * rx[i / 4 * 4 + 1] +
+        ry[i % 4 + 8] * rx[i / 4 * 4 + 2] +
+        ry[i % 4 + 12] * rx[i / 4 * 4 + 3];
+
+    for (int i = 0; i < 16; i++)
+        t2[i] = rz[i % 4] * t1[i / 4 * 4] +
+        rz[i % 4 + 4] * t1[i / 4 * 4 + 1] +
+        rz[i % 4 + 8] * t1[i / 4 * 4 + 2] +
+        rz[i % 4 + 12] * t1[i / 4 * 4 + 3];
+
+    for (int i = 0; i < 16; i++)
+        transformMatrix[i] =
+        s[i % 4] * t2[i / 4 * 4] +
+        s[i % 4 + 4] * t2[i / 4 * 4 + 1] +
+        s[i % 4 + 8] * t2[i / 4 * 4 + 2] +
+        s[i % 4 + 12] * t2[i / 4 * 4 + 3];
+}
 
 const char* VS = R"(
 #version 330 core
@@ -138,6 +206,36 @@ void InitTriangle()
     glBindVertexArray(0);
 }
 
+void InitPentagon()
+{
+    glGenVertexArrays(1, &VAO_pentagon);
+    glBindVertexArray(VAO_pentagon);
+
+    glGenBuffers(1, &VBO_pentagon);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_pentagon);
+    glBufferData(GL_ARRAY_BUFFER,
+        vertices_pentagon.size() * sizeof(GLfloat),
+        vertices_pentagon.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &EBO_pentagon);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_pentagon);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+        indices_pentagon.size() * sizeof(GLuint),
+        indices_pentagon.data(), GL_STATIC_DRAW);
+
+    // coord
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+        6 * sizeof(GLfloat), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+        6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
 void InitShaders()
 {
     InitShaderColor();
@@ -147,11 +245,16 @@ void InitBuffers()
 {
 	InitSquare();
 	InitTriangle();
+	InitPentagon();
 }
 
 void Draw()
 {
-    if (task == 1)
+    if (task == 0)
+    {
+
+    }
+    else if (task == 1)
     {
         // Левая половина экрана (квадрат)
         glViewport(0, 0, 800, 800);
@@ -164,6 +267,27 @@ void Draw()
         glUseProgram(Program);
         glBindVertexArray(VAO_triangle);
         glDrawElements(GL_TRIANGLES, indices_triangle.size(), GL_UNSIGNED_INT, 0);
+    }
+    else if (task == 2)
+    {
+        glViewport(400, 0, 800, 800);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_pentagon);
+        glDrawElements(GL_TRIANGLE_FAN, indices_pentagon.size(), GL_UNSIGNED_INT, 0);
+    }
+    else if (task == 2)
+    {
+        glViewport(400, 0, 800, 800);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_pentagon);
+        glDrawElements(GL_TRIANGLE_FAN, indices_pentagon.size(), GL_UNSIGNED_INT, 0);
+    }
+    else if (task == 2)
+    {
+        glViewport(400, 0, 800, 800);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_pentagon);
+        glDrawElements(GL_TRIANGLE_FAN, indices_pentagon.size(), GL_UNSIGNED_INT, 0);
     }
 }
 
@@ -195,6 +319,18 @@ int main()
                 {
                 case(sf::Keyboard::Num1):
                     task = 1;
+                    break;
+                case(sf::Keyboard::Q):
+                    task = 0;
+                    break;
+                case(sf::Keyboard::Num2):
+                    task = 2;
+                    break;
+                case(sf::Keyboard::W):
+                    task = 21;
+                    break;
+                case(sf::Keyboard::E):
+                    task = 22;
                     break;
                 }
             }
