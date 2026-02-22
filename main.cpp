@@ -6,13 +6,17 @@
 #include <cmath>
 
 GLuint Program;
+GLuint ProgramStripes;
+
 GLuint VAO_square, VBO_square, EBO_square;
 GLuint VAO_triangle, VBO_triangle, EBO_triangle;
 GLuint VAO_pentagon, VBO_pentagon, EBO_pentagon;
+GLuint VAO_cube, VBO_cube, EBO_cube;
 
 GLfloat transformMatrix[16];
+GLuint modelLoc;
 
-int task = 1;
+int task;
 
 // Вершины: coord (x,y,z) + color (r,g,b)
 std::vector<GLfloat> vertices_square = {
@@ -23,12 +27,20 @@ std::vector<GLfloat> vertices_square = {
     -0.5f,  0.5f, 0.0f,  0.2f, 0.7f, 1.0f  // верхняя левая
 };
 
+std::vector<GLuint> indices_square = {
+    0, 1, 2, 3
+};
+
 // Вершины: coord (x,y,z) + color (r,g,b)
 std::vector<GLfloat> vertices_triangle = {
     // x,     y,    z      r,   g,   b
     -0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f, // нижняя левая
      0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f, // нижняя правая
      0.0f,  0.5f, 0.0f,  0.0f, 1.0f, 0.0f, // верхняя
+};
+
+std::vector<GLuint> indices_triangle = {
+    0, 1, 2
 };
 
 std::vector<GLfloat> vertices_pentagon = {
@@ -40,17 +52,31 @@ std::vector<GLfloat> vertices_pentagon = {
     -0.475f,-0.155f, 0.0f, 1.0f, 0.0f, 0.0f,
 };
 
-
-std::vector<GLuint> indices_square = {
-    0, 1, 2, 3
-};
-
-std::vector<GLuint> indices_triangle = {
-    0, 1, 2
-};
 std::vector<GLuint> indices_pentagon = {
     0, 1, 2, 3, 4
 };
+
+std::vector<GLfloat> vertices_cube = {
+    -0.5f, -0.5f,  0.5f,  0.8f, 0.5f, 0.1f,
+    -0.5f,  0.5f,  0.5f,  0.8f, 0.5f, 0.1f,
+     0.5f, -0.5f,  0.5f,  0.8f, 0.5f, 0.1f,
+     0.5f,  0.5f,  0.5f,  0.8f, 0.5f, 0.1f,
+
+    -0.5f, -0.5f, -0.5f,  0.8f, 0.5f, 0.1f,
+    -0.5f,  0.5f, -0.5f,  0.8f, 0.5f, 0.1f,
+     0.5f, -0.5f, -0.5f,  0.8f, 0.5f, 0.1f,
+     0.5f,  0.5f, -0.5f,  0.8f, 0.5f, 0.1f,
+};
+
+std::vector<GLint> indices_cube = {
+	0, 1, 3, 2, // передняя
+	4, 5, 7, 6, // задняя
+	0, 4, 5, 1, // левая
+	2, 6, 7, 3, // правая
+	0, 4, 6, 2, // нижняя
+	1, 5, 7, 3  // верхняя
+};
+
 
 void CreateTransformMatrix(float angleX, float angleY, float angleZ)
 {
@@ -109,10 +135,11 @@ const char* VS = R"(
 layout(location=0) in vec3 coord;
 layout(location=1) in vec3 color;
 
+uniform mat4 model;
 out vec3 vColor;
 
 void main() {
-    gl_Position = vec4(coord, 1.0);
+    gl_Position = model * vec4(coord,1.0);
     vColor = color;
 }
 )";
@@ -124,6 +151,36 @@ out vec4 color;
 
 void main() {
     color = vec4(vColor, 1.0);
+}
+)";
+
+const char* VS_stripes = R"(
+#version 330 core
+layout(location=0) in vec3 coord;
+
+out vec3 vPosition;
+
+void main() {
+    gl_Position = vec4(coord, 1.0); // без матрицы
+    vPosition = coord;              // передаём исходную позицию
+}
+)";
+
+const char* FS_stripes = R"(
+#version 330 core
+in vec3 vPosition;
+out vec4 color;
+
+void main() {     
+    float k = 20.0;
+    int sum = int((vPosition.x + 0.5) * k);
+
+    if ( (sum - (sum / 2 * 2)) == 0 ) {  
+        color = vec4(0.6, 0.8, 1.0, 1.0);    // голубой
+    } 
+    else {  
+        color = vec4(1.0, 1.0, 1.0, 1.0);    // белый
+    }
 }
 )";
 
@@ -144,6 +201,31 @@ void InitShaderColor()
 
     glDeleteShader(v);
     glDeleteShader(f);
+}
+
+void InitShaderStripes()
+{
+    GLuint v = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(v, 1, &VS_stripes, nullptr);
+    glCompileShader(v);
+
+    GLuint f = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(f, 1, &FS_stripes, nullptr);
+    glCompileShader(f);
+
+    ProgramStripes = glCreateProgram();
+    glAttachShader(ProgramStripes, v);
+    glAttachShader(ProgramStripes, f);
+    glLinkProgram(ProgramStripes);
+
+    glDeleteShader(v);
+    glDeleteShader(f);
+}
+
+void InitShaders()
+{
+    InitShaderColor();
+	InitShaderStripes();
 }
 
 void InitSquare()
@@ -236,9 +318,33 @@ void InitPentagon()
     glBindVertexArray(0);
 }
 
-void InitShaders()
-{
-    InitShaderColor();
+void InitCube() {
+    glGenVertexArrays(1, &VAO_cube);
+    glBindVertexArray(VAO_cube);
+
+    glGenBuffers(1, &VBO_cube);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_cube);
+    glBufferData(GL_ARRAY_BUFFER,
+        vertices_cube.size() * sizeof(GLfloat),
+        vertices_cube.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &EBO_cube);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_cube);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+        indices_cube.size() * sizeof(GLint),
+        indices_cube.data(), GL_STATIC_DRAW);
+
+    // coord
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+        6 * sizeof(GLfloat), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+        6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
 }
 
 void InitBuffers()
@@ -246,16 +352,25 @@ void InitBuffers()
 	InitSquare();
 	InitTriangle();
 	InitPentagon();
+    InitCube();
 }
 
 void Draw()
 {
     if (task == 0)
     {
+        CreateTransformMatrix(0, 0, 0);
 
+        modelLoc = glGetUniformLocation(Program, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
     }
     else if (task == 1)
     {
+        CreateTransformMatrix(0, 0, 0);
+
+        modelLoc = glGetUniformLocation(Program, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+
         // Левая половина экрана (квадрат)
         glViewport(0, 0, 800, 800);
         glUseProgram(Program);
@@ -270,6 +385,11 @@ void Draw()
     }
     else if (task == 2)
     {
+        CreateTransformMatrix(0, 0, 0);
+
+        modelLoc = glGetUniformLocation(Program, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+
         glViewport(400, 0, 800, 800);
         glUseProgram(Program);
         glBindVertexArray(VAO_pentagon);
@@ -277,17 +397,37 @@ void Draw()
     }
     else if (task == 2)
     {
+        CreateTransformMatrix(0, 0, 0);
+
+        modelLoc = glGetUniformLocation(Program, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+
         glViewport(400, 0, 800, 800);
         glUseProgram(Program);
         glBindVertexArray(VAO_pentagon);
         glDrawElements(GL_TRIANGLE_FAN, indices_pentagon.size(), GL_UNSIGNED_INT, 0);
     }
-    else if (task == 2)
+    else if (task == 21)
     {
+        CreateTransformMatrix(0.5f, 0.5f, 0);
+
+        modelLoc = glGetUniformLocation(Program, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+
         glViewport(400, 0, 800, 800);
         glUseProgram(Program);
-        glBindVertexArray(VAO_pentagon);
-        glDrawElements(GL_TRIANGLE_FAN, indices_pentagon.size(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(VAO_cube);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+    }
+    else if (task == 22)
+    {
+        glViewport(400, 0, 800, 800);
+        glUseProgram(ProgramStripes);
+        glBindVertexArray(VAO_square);
+        glDrawElements(GL_QUADS, indices_square.size(), GL_UNSIGNED_INT, 0);
+    }
+    else if (task == 3)
+    {
     }
 }
 
@@ -306,6 +446,8 @@ int main()
     InitShaders();
     InitBuffers();
 
+    task = 1;
+
     while (window.isOpen())
     {
         sf::Event e;
@@ -317,21 +459,29 @@ int main()
             {
                 switch (e.key.code)
                 {
-                case(sf::Keyboard::Num1):
+                case sf::Keyboard::Num1:
                     task = 1;
                     break;
-                case(sf::Keyboard::Q):
+                case sf::Keyboard::Q:
                     task = 0;
                     break;
-                case(sf::Keyboard::Num2):
+                case sf::Keyboard::Num2:
                     task = 2;
                     break;
-                case(sf::Keyboard::W):
+                case sf::Keyboard::W:
                     task = 21;
                     break;
-                case(sf::Keyboard::E):
+                case sf::Keyboard::E:
                     task = 22;
                     break;
+				case sf::Keyboard::Num3:
+                    task == 3;
+                    break;
+                }
+
+                if (task == 3)
+                {
+
                 }
             }
         }
