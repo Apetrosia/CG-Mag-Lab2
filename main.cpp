@@ -16,6 +16,8 @@ GLuint VAO_cube, VBO_cube, EBO_cube;
 GLfloat transformMatrix[16];
 GLuint modelLoc;
 
+float pedestalAngleY = 0.0f;
+
 int task;
 
 // Вершины: coord (x,y,z) + color (r,g,b)
@@ -456,30 +458,38 @@ void Draw()
 
         glUniform1i(useColorLoc, 1);
 
-        // Нижний золотой кубик (чуть темнее)
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, -0.1f);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
-        glUniform3f(colorLoc, 0.7f, 0.6f, 0.1f);
-        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+        // Центр вращения пьедестала (нижний золотой кубик)
+        float cx = -0.45f, cy = -0.1f, cz = 0.0f;
 
-        
-        // Верхний золотой кубик
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, 0.2f);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
-        glUniform3f(colorLoc, 1.0f, 0.84f, 0.0f);
-        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+        auto drawPedestalCube = [&](float scale, float offsetX, float offsetY, float offsetZ, float r, float g, float b)
+            {
+                // Смещаем кубик относительно центра пьедестала
+                float localX = offsetX - cx;
+                float localY = offsetY - cy;
+                float localZ = offsetZ - cz;
 
-        // Серебряный кубик слева
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.75f, -0.1f);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
-        glUniform3f(colorLoc, 0.75f, 0.75f, 0.75f);
-        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+                // Вращаем вокруг OY
+                float angle = pedestalAngleY;
+                float cosA = cos(angle), sinA = sin(angle);
+                float rx = cosA * localX + sinA * localZ;
+                float rz = -sinA * localX + cosA * localZ;
 
-        // Бронзовый кубик справа (меньше)
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.27f, -0.165f, -0.115f);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
-        glUniform3f(colorLoc, 0.8f, 0.5f, 0.2f);
-        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+                // Возвращаем в мировые координаты
+                float finalX = rx + cx;
+                float finalY = localY + cy;
+                float finalZ = rz + cz;
+
+                CreateTransformMatrix(0.0f, 0.0f, 0.0f, scale, finalX, finalY, finalZ);
+                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+                glUniform3f(colorLoc, r, g, b);
+                glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+            };
+
+        // Рисуем кубики пьедестала
+        drawPedestalCube(0.3f, -0.45f, -0.1f, 0.0f, 0.7f, 0.6f, 0.1f); // нижний золотой
+        drawPedestalCube(0.3f, -0.45f, 0.2f, 0.0f, 1.0f, 0.84f, 0.0f);  // верхний золотой
+        drawPedestalCube(0.3f, -0.75f, -0.1f, 0.0f, 0.75f, 0.75f, 0.75f); // серебряный
+        drawPedestalCube(0.27f, -0.165f, -0.115f, 0.0f, 0.8f, 0.5f, 0.2f); // бронзовый
     }
 }
 
@@ -494,6 +504,7 @@ int main()
 
     window.setVerticalSyncEnabled(true);
     glewInit();
+	glEnable(GL_DEPTH_TEST);
 
     InitShaders();
     InitBuffers();
@@ -529,6 +540,12 @@ int main()
 				case sf::Keyboard::Num3:
                     task = 3;
                     break;
+                case sf::Keyboard::Z:
+                    pedestalAngleY += 0.05f;
+                    break; // влево
+                case sf::Keyboard::X:
+                    pedestalAngleY -= 0.05f;
+                    break; // вправо
                 }
 
                 sf::Vector2u size = window.getSize();
@@ -538,6 +555,7 @@ int main()
                     {
                         window.create(sf::VideoMode(800, 800), "Pedestal", sf::Style::Default, sf::ContextSettings(24));
                         glewInit();
+                        glEnable(GL_DEPTH_TEST);
                         InitShaders();
                         InitBuffers();
                     }
@@ -548,6 +566,7 @@ int main()
                     {
                         window.create(sf::VideoMode(1600, 800), "Square right side", sf::Style::Default, sf::ContextSettings(24));
                         glewInit();
+                        glEnable(GL_DEPTH_TEST);
                         InitShaders();
                         InitBuffers();
                     }
@@ -555,7 +574,7 @@ int main()
             }
         }
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         Draw();
 
