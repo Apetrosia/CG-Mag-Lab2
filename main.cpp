@@ -78,7 +78,9 @@ std::vector<GLint> indices_cube = {
 };
 
 
-void CreateTransformMatrix(float angleX, float angleY, float angleZ)
+void CreateTransformMatrix(float angleX, float angleY, float angleZ,
+    float scale = 1.0f,
+    float tx = 0.0f, float ty = 0.0f, float tz = 0.0f)
 {
     GLfloat rx[16] = {
         1,0,0,0,
@@ -102,32 +104,37 @@ void CreateTransformMatrix(float angleX, float angleY, float angleZ)
     };
 
     GLfloat s[16] = {
-        1,0,0,0,
-        0,1,0,0,
-        0,0,1,0,
+        scale,0,0,0,
+        0,scale,0,0,
+        0,0,scale,0,
         0,0,0,1
     };
 
-    GLfloat t1[16], t2[16];
+    auto Multiply4x4 = [](GLfloat* a, GLfloat* b, GLfloat* out)
+        {
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                {
+                    out[i * 4 + j] = 0;
+                    for (int k = 0; k < 4; k++)
+                        out[i * 4 + j] += a[i * 4 + k] * b[k * 4 + j];
+                }
+        };
 
-    for (int i = 0; i < 16; i++)
-        t1[i] = ry[i % 4] * rx[i / 4 * 4] +
-        ry[i % 4 + 4] * rx[i / 4 * 4 + 1] +
-        ry[i % 4 + 8] * rx[i / 4 * 4 + 2] +
-        ry[i % 4 + 12] * rx[i / 4 * 4 + 3];
+    GLfloat rxy[16], rxyz[16], rs[16];
+    Multiply4x4(ry, rx, rxy);     // ry * rx
+    Multiply4x4(rz, rxy, rxyz);   // rz * (ry*rx)
+    Multiply4x4(rxyz, s, rs);     // (R*S)
 
+    // Копируем R*S
     for (int i = 0; i < 16; i++)
-        t2[i] = rz[i % 4] * t1[i / 4 * 4] +
-        rz[i % 4 + 4] * t1[i / 4 * 4 + 1] +
-        rz[i % 4 + 8] * t1[i / 4 * 4 + 2] +
-        rz[i % 4 + 12] * t1[i / 4 * 4 + 3];
+        transformMatrix[i] = rs[i];
 
-    for (int i = 0; i < 16; i++)
-        transformMatrix[i] =
-        s[i % 4] * t2[i / 4 * 4] +
-        s[i % 4 + 4] * t2[i / 4 * 4 + 1] +
-        s[i % 4 + 8] * t2[i / 4 * 4 + 2] +
-        s[i % 4 + 12] * t2[i / 4 * 4 + 3];
+    // Прямое добавление сдвига в последний столбец
+    transformMatrix[12] = tx;
+    transformMatrix[13] = ty;
+    transformMatrix[14] = tz;
+    transformMatrix[15] = 1.0f;
 }
 
 const char* VS = R"(
@@ -149,8 +156,14 @@ const char* FS = R"(
 in vec3 vColor;
 out vec4 color;
 
+uniform bool useUniformColor;
+uniform vec3 uColor;
+
 void main() {
-    color = vec4(vColor, 1.0);
+    if (useUniformColor)
+        color = vec4(uColor, 1.0);
+    else
+        color = vec4(vColor, 1.0);
 }
 )";
 
@@ -357,6 +370,11 @@ void InitBuffers()
 
 void Draw()
 {
+    if (task != 3)
+    {
+        GLint useColorLoc = glGetUniformLocation(Program, "useUniformColor");
+        glUniform1i(useColorLoc, 0);
+    }
     if (task == 0)
     {
         CreateTransformMatrix(0, 0, 0);
@@ -428,6 +446,40 @@ void Draw()
     }
     else if (task == 3)
     {
+        glViewport(0, 0, 800, 800);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_cube);
+
+        GLint useColorLoc = glGetUniformLocation(Program, "useUniformColor");
+        GLint colorLoc = glGetUniformLocation(Program, "uColor");
+        GLint modelLoc = glGetUniformLocation(Program, "model");
+
+        glUniform1i(useColorLoc, 1);
+
+        // Нижний золотой кубик (чуть темнее)
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, -0.1f);
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+        glUniform3f(colorLoc, 0.7f, 0.6f, 0.1f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+
+        
+        // Верхний золотой кубик
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, 0.2f);
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+        glUniform3f(colorLoc, 1.0f, 0.84f, 0.0f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+
+        // Серебряный кубик слева
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.75f, -0.1f);
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+        glUniform3f(colorLoc, 0.75f, 0.75f, 0.75f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
+
+        // Бронзовый кубик справа (меньше)
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.27f, -0.165f, -0.115f);
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+        glUniform3f(colorLoc, 0.8f, 0.5f, 0.2f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
     }
 }
 
@@ -475,13 +527,30 @@ int main()
                     task = 22;
                     break;
 				case sf::Keyboard::Num3:
-                    task == 3;
+                    task = 3;
                     break;
                 }
 
+                sf::Vector2u size = window.getSize();
                 if (task == 3)
                 {
-
+                    if (size.x != 800 || size.y != 800)
+                    {
+                        window.create(sf::VideoMode(800, 800), "Pedestal", sf::Style::Default, sf::ContextSettings(24));
+                        glewInit();
+                        InitShaders();
+                        InitBuffers();
+                    }
+                }
+                else
+                {
+                    if (size.x != 1600 || size.y != 800)
+                    {
+                        window.create(sf::VideoMode(1600, 800), "Square right side", sf::Style::Default, sf::ContextSettings(24));
+                        glewInit();
+                        InitShaders();
+                        InitBuffers();
+                    }
                 }
             }
         }
