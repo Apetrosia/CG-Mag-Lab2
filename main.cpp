@@ -14,10 +14,14 @@ GLuint VAO_pentagon, VBO_pentagon, EBO_pentagon;
 GLuint VAO_cube, VBO_cube, EBO_cube;
 
 GLfloat transformMatrix[16];
-GLfloat pivotRot[16];
+GLfloat pivotRot1[16];
+GLfloat pivotRot2[16];
+GLfloat tmp[16];
 GLuint modelLoc;
 
 float pedestalAngleY = 0.0f;
+float pedestalAngleCubeY = 0.0f;
+float pedestalAngleCenterY = 0.0f;
 
 int task;
 
@@ -511,33 +515,41 @@ void Draw()
         glUniform1i(useColorLoc, 1);
 
         // Нижний золотой кубик (чуть темнее)
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, -0.1f);
-        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
-        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        CreateTransformMatrix(0.0f, pedestalAngleCubeY, 0.0f, 0.3f, -0.45f, -0.1f);
+        CreatePivotRotationY(pedestalAngleCenterY, 0.45f, 0.0f, 0.0f, pivotRot1);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot2);
+        Mul(pivotRot1, transformMatrix, tmp);
+        Mul(pivotRot2, tmp, finalMat);
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
         glUniform3f(colorLoc, 0.7f, 0.6f, 0.1f);
         glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
 
         // Верхний золотой кубик
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, 0.2f);
-        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
-        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        CreateTransformMatrix(0.0f, pedestalAngleCubeY, 0.0f, 0.3f, -0.45f, 0.2f);
+        CreatePivotRotationY(pedestalAngleCenterY, 0.45f, 0.0f, 0.0f, pivotRot1);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot2);
+        Mul(pivotRot1, transformMatrix, tmp);
+        Mul(pivotRot2, tmp, finalMat);
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
         glUniform3f(colorLoc, 1.0f, 0.84f, 0.0f);
         glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
 
         // Серебряный кубик слева
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.75f, -0.1f);
-        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
-        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        CreateTransformMatrix(0.0f, pedestalAngleCubeY, 0.0f, 0.3f, -0.75f, -0.1f);
+        CreatePivotRotationY(pedestalAngleCenterY, 0.45f, 0.0f, 0.0f, pivotRot1);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot2);
+        Mul(pivotRot1, transformMatrix, tmp);
+        Mul(pivotRot2, tmp, finalMat);
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
         glUniform3f(colorLoc, 0.75f, 0.75f, 0.75f);
         glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
 
         // Бронзовый кубик справа (меньше)
-        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.27f, -0.165f, -0.115f);
-        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
-        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        CreateTransformMatrix(0.0f, pedestalAngleCubeY, 0.0f, 0.27f, -0.165f, -0.115f);
+        CreatePivotRotationY(pedestalAngleCenterY, 0.45f, 0.0f, 0.0f, pivotRot1);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot2);
+        Mul(pivotRot1, transformMatrix, tmp);
+        Mul(pivotRot2, tmp, finalMat);
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
         glUniform3f(colorLoc, 0.8f, 0.5f, 0.2f);
         glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
@@ -592,10 +604,22 @@ int main()
                     task = 3;
                     break;
                 case sf::Keyboard::Z:
-                    pedestalAngleY += 0.05f;
+                    pedestalAngleCenterY += 0.05f;
                     break; // влево
                 case sf::Keyboard::X:
+                    pedestalAngleCenterY -= 0.05f;
+                    break; // вправо
+                case sf::Keyboard::A:
+                    pedestalAngleY += 0.05f;
+                    break; // влево
+                case sf::Keyboard::S:
                     pedestalAngleY -= 0.05f;
+                    break; // вправо
+                case sf::Keyboard::C:
+                    pedestalAngleCubeY += 0.05f;
+                    break; // влево
+                case sf::Keyboard::V:
+                    pedestalAngleCubeY -= 0.05f;
                     break; // вправо
                 }
 
@@ -609,6 +633,9 @@ int main()
                         glEnable(GL_DEPTH_TEST);
                         InitShaders();
                         InitBuffers();
+                        pedestalAngleY = 0.0f;
+                        pedestalAngleCubeY = 0.0f;
+                        pedestalAngleCenterY = 0.0f;
                     }
                 }
                 else
