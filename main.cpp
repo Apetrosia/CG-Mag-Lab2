@@ -14,6 +14,7 @@ GLuint VAO_pentagon, VBO_pentagon, EBO_pentagon;
 GLuint VAO_cube, VBO_cube, EBO_cube;
 
 GLfloat transformMatrix[16];
+GLfloat pivotRot[16];
 GLuint modelLoc;
 
 float pedestalAngleY = 0.0f;
@@ -79,6 +80,18 @@ std::vector<GLint> indices_cube = {
 	1, 5, 7, 3  // верхняя
 };
 
+GLfloat finalMat[16];
+auto Mul = [](GLfloat* a, GLfloat* b, GLfloat* out)
+    {
+        for (int col = 0; col < 4; col++)
+            for (int row = 0; row < 4; row++)
+            {
+                out[col * 4 + row] = 0.0f;
+                for (int k = 0; k < 4; k++)
+                    out[col * 4 + row] +=
+                    a[k * 4 + row] * b[col * 4 + k];
+            }
+    };
 
 void CreateTransformMatrix(float angleX, float angleY, float angleZ,
     float scale = 1.0f,
@@ -137,6 +150,45 @@ void CreateTransformMatrix(float angleX, float angleY, float angleZ,
     transformMatrix[13] = ty;
     transformMatrix[14] = tz;
     transformMatrix[15] = 1.0f;
+}
+
+void CreatePivotRotationY(float angle, float cx, float cy, float cz, GLfloat* out)
+{
+    GLfloat Tneg[16] = {
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        -cx,-cy,-cz,1
+    };
+
+    GLfloat RY[16] = {
+        cos(angle),0,sin(angle),0,
+        0,1,0,0,
+        -sin(angle),0,cos(angle),0,
+        0,0,0,1
+    };
+
+    GLfloat Tpos[16] = {
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        cx,cy,cz,1
+    };
+
+    auto Mul = [](GLfloat* a, GLfloat* b, GLfloat* out)
+        {
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                {
+                    out[i * 4 + j] = 0;
+                    for (int k = 0; k < 4; k++)
+                        out[i * 4 + j] += a[i * 4 + k] * b[k * 4 + j];
+                }
+        };
+
+    GLfloat tmp[16];
+    Mul(RY, Tneg, tmp);     // R * T(-C)
+    Mul(Tpos, tmp, out);    // T(C) * R * T(-C)
 }
 
 const char* VS = R"(
@@ -458,38 +510,37 @@ void Draw()
 
         glUniform1i(useColorLoc, 1);
 
-        // Центр вращения пьедестала (нижний золотой кубик)
-        float cx = -0.45f, cy = -0.1f, cz = 0.0f;
+        // Нижний золотой кубик (чуть темнее)
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, -0.1f);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
+        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
+        glUniform3f(colorLoc, 0.7f, 0.6f, 0.1f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
 
-        auto drawPedestalCube = [&](float scale, float offsetX, float offsetY, float offsetZ, float r, float g, float b)
-            {
-                // Смещаем кубик относительно центра пьедестала
-                float localX = offsetX - cx;
-                float localY = offsetY - cy;
-                float localZ = offsetZ - cz;
+        // Верхний золотой кубик
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.45f, 0.2f);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
+        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
+        glUniform3f(colorLoc, 1.0f, 0.84f, 0.0f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
 
-                // Вращаем вокруг OY
-                float angle = pedestalAngleY;
-                float cosA = cos(angle), sinA = sin(angle);
-                float rx = cosA * localX + sinA * localZ;
-                float rz = -sinA * localX + cosA * localZ;
+        // Серебряный кубик слева
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.3f, -0.75f, -0.1f);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
+        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
+        glUniform3f(colorLoc, 0.75f, 0.75f, 0.75f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
 
-                // Возвращаем в мировые координаты
-                float finalX = rx + cx;
-                float finalY = localY + cy;
-                float finalZ = rz + cz;
-
-                CreateTransformMatrix(0.0f, 0.0f, 0.0f, scale, finalX, finalY, finalZ);
-                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
-                glUniform3f(colorLoc, r, g, b);
-                glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
-            };
-
-        // Рисуем кубики пьедестала
-        drawPedestalCube(0.3f, -0.45f, -0.1f, 0.0f, 0.7f, 0.6f, 0.1f); // нижний золотой
-        drawPedestalCube(0.3f, -0.45f, 0.2f, 0.0f, 1.0f, 0.84f, 0.0f);  // верхний золотой
-        drawPedestalCube(0.3f, -0.75f, -0.1f, 0.0f, 0.75f, 0.75f, 0.75f); // серебряный
-        drawPedestalCube(0.27f, -0.165f, -0.115f, 0.0f, 0.8f, 0.5f, 0.2f); // бронзовый
+        // Бронзовый кубик справа (меньше)
+        CreateTransformMatrix(0.0f, 0.0f, 0.0f, 0.27f, -0.165f, -0.115f);
+        CreatePivotRotationY(pedestalAngleY, 0.0f, 0.0f, 0.0f, pivotRot);
+        Mul(pivotRot, transformMatrix, finalMat); // R_pivot * M_local
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, finalMat);
+        glUniform3f(colorLoc, 0.8f, 0.5f, 0.2f);
+        glDrawElements(GL_QUADS, indices_cube.size(), GL_UNSIGNED_INT, 0);
     }
 }
 
