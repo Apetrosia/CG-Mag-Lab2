@@ -8,6 +8,7 @@
 GLuint Program;
 GLuint ProgramStripes;
 
+GLuint VAO_test, VBO_test, EBO_test;
 GLuint VAO_square, VBO_square, EBO_square;
 GLuint VAO_triangle, VBO_triangle, EBO_triangle;
 GLuint VAO_pentagon, VBO_pentagon, EBO_pentagon;
@@ -24,6 +25,23 @@ float pedestalAngleCubeY = 0.0f;
 float pedestalAngleCenterY = 0.0f;
 
 int task;
+
+std::vector<GLfloat> vertices_test = {
+    // x,     y,    z      r,   g,   b
+    -0.95f,  0.9f,  0.0f,  1.0f, 0.0f, 0.0f,
+    -0.9f,  -0.5f,  0.0f,  0.0f, 1.0f, 0.0f,
+    -0.2f,  -0.2f,  0.0f,  0.5f, 0.0f, 1.0f,
+    -0.3f,   0.5f,  0.0f,  0.2f, 0.7f, 1.0f,
+	 0.1f,   0.95f, 0.0f,  1.0f, 1.0f, 0.0f,
+	 0.2f,  -0.85f, 0.0f,  1.0f, 0.0f, 1.0f,
+	 0.6f,  -0.3f,  0.0f,  0.0f, 1.0f, 1.0f,
+	 0.7f,   0.4f,  0.0f,  0.5f, 0.5f, 0.5f,
+	 0.9f,   0.1f,  0.0f,  0.3f, 0.3f, 0.3f
+};
+
+std::vector<GLuint> indices_test = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8
+};
 
 // Вершины: coord (x,y,z) + color (r,g,b)
 std::vector<GLfloat> vertices_square = {
@@ -214,7 +232,7 @@ const char* FS = R"(
 in vec3 vColor;
 out vec4 color;
 
-uniform bool useUniformColor;
+uniform bool useUniformColor = false;
 uniform vec3 uColor;
 
 void main() {
@@ -297,6 +315,36 @@ void InitShaders()
 {
     InitShaderColor();
 	InitShaderStripes();
+}
+
+void InitTest()
+{
+    glGenVertexArrays(1, &VAO_test);
+    glBindVertexArray(VAO_test);
+
+    glGenBuffers(1, &VBO_test);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_test);
+    glBufferData(GL_ARRAY_BUFFER,
+        vertices_test.size() * sizeof(GLfloat),
+        vertices_test.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &EBO_test);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_test);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+        indices_test.size() * sizeof(GLuint),
+        indices_test.data(), GL_STATIC_DRAW);
+
+    // coord
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+        6 * sizeof(GLfloat), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+        6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
 }
 
 void InitSquare()
@@ -420,6 +468,7 @@ void InitCube() {
 
 void InitBuffers()
 {
+    InitTest();
 	InitSquare();
 	InitTriangle();
 	InitPentagon();
@@ -436,9 +485,58 @@ void Draw()
     if (task == 0)
     {
         CreateTransformMatrix(0, 0, 0);
-
         modelLoc = glGetUniformLocation(Program, "model");
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, transformMatrix);
+
+        glViewport(0, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_POINTS, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(200, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_LINES, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(400, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_LINE_STRIP, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(600, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_LINE_LOOP, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(800, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_POLYGON, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(1000, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_QUADS, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(1200, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_QUAD_STRIP, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(1400, 600, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_TRIANGLES, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(0, 400, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_TRIANGLE_STRIP, indices_test.size(), GL_UNSIGNED_INT, 0);
+
+        glViewport(200, 400, 200, 200);
+        glUseProgram(Program);
+        glBindVertexArray(VAO_test);
+        glDrawElements(GL_TRIANGLE_FAN, indices_test.size(), GL_UNSIGNED_INT, 0);
     }
     else if (task == 1)
     {
